@@ -1,0 +1,9 @@
+*.pyc
+*.pyd
+*.pyo
+
+/.idea
+
+/generated/*
+!/generated/*.cache
+
