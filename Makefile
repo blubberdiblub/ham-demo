@@ -1,14 +1,18 @@
 VEHICLE_NUMBERS := $(shell seq -w 0 15)
 VEHICLES := $(patsubst %,generated/vehicle%.png,$(VEHICLE_NUMBERS))
 
+FRAME_NUMBERS := $(shell seq -w 0 299)
+FRAMES_GIF := $(patsubst %,generated/frame%.gif,$(FRAME_NUMBERS))
+FRAMES_PNG := $(patsubst %,generated/frame%.png,$(FRAME_NUMBERS))
+
 .PHONY: all
 all: animation frames atlas background vehicles
 
 .PHONY: animation
-animation: generated/animation.png
+animation: generated/animation.gif
 
 .PHONY: frames
-frames: generated/frame000.png
+frames: $(FRAMES_GIF)
 
 .PHONY: atlas
 atlas: generated/atlas.png
@@ -22,6 +26,12 @@ vehicles: $(VEHICLES)
 .PHONY: clean
 clean:
 	rm -f -- generated/*
+
+generated/animation.gif: $(FRAMES_GIF)
+	gifsicle --loopcount=forever --optimize=2 $(FRAMES_GIF) > $@
+
+$(FRAMES_GIF): %.gif: %.png
+	convert -- $< $@
 
 generated/animation.png: generated/frame000.png
 	apngasm $@ $<
