@@ -14,7 +14,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.ma as ma
 
-from PIL import Image
+import PIL.Image as Image
+import PIL.ImageDraw as ImageDraw
+import PIL.ImageFont as ImageFont
 
 
 def load_palette(fname, mtime=False):
@@ -240,30 +242,83 @@ def blit(dst, src, dst_x=0, dst_y=0):
     dst[y1:y2, x1:x2] = intermediate
 
 
-def render(canvas, palette, vehicle, position,
-           fname=None, format=None, fig=None, frame_skip=None):
-    render_frame = frame_skip is None or next(frame_skip)
-    if not render_frame:
-        return
+def render(canvas, palette, vehicle=None, position=(0, 0)):
+    if vehicle is not None:
+        canvas = canvas.copy()
+        blit(canvas, vehicle,
+             dst_x=int(round(position[0])),
+             dst_y=int(round(position[1])))
 
-    if not fname and not fig:
-        return
+    rgb8 = Image.fromarray(from_ham6(canvas, palette, background=0))
+    return rgb8.resize((rgb8.width * 2, rgb8.height * 2),
+                       resample=Image.NEAREST)
 
-    ham6 = canvas.copy()
-    blit(ham6, vehicle,
-         dst_x=int(round(position[0])),
-         dst_y=int(round(position[1])))
-    rgb8 = (from_ham6(ham6, palette, background=0)
-            .repeat(2, axis=1)
-            .repeat(2, axis=0))
 
-    if fname:
-        Image.fromarray(rgb8).save(fname, format=format)
+def ham6_to_image(ham6, palette, background=None):
+    image = Image.fromarray(from_ham6(ham6, palette, background=background))
+    return image.resize((image.width * 2, image.height * 2),
+                        resample=Image.NEAREST)
 
-    if fig is not None:
-        fig.clf()
-        fig.figimage(rgb8)
-        fig.canvas.draw()
+
+def render_zoom(ham6, src_box, canvas, dst_box, t=1, color=(255, 255, 255),
+                font=None, spacing=4):
+    src_x, src_y, src_r, src_b = src_box
+    src_w = src_r - src_x
+    src_h = src_b - src_y
+
+    dst_x, dst_y, dst_r, dst_b = dst_box
+    dst_w = dst_r - dst_x
+    dst_h = dst_b - dst_y
+
+    box_w = dst_w / src_w
+    box_h = dst_h / src_h
+
+    canvas = canvas.copy()
+    ratio_x = canvas.width / ham6.shape[1]
+    ratio_y = canvas.height / ham6.shape[0]
+    crop_box = (int(round(src_x * ratio_x)),
+                int(round(src_y * ratio_y)),
+                int(round(src_r * ratio_x)),
+                int(round(src_b * ratio_y)))
+    crop = canvas.crop(crop_box)
+    zoom = crop.resize((dst_w, dst_h), resample=Image.NEAREST)
+
+    if font is None:
+        font = ImageFont.load_default()
+
+    draw = ImageDraw.Draw(zoom, 'RGBA')
+
+    contrast = tuple(255 if value < 128 else 0
+                     for value in zoom.getpixel((0, 0)))
+    lines = ["Value $00", "= Pal. #0", "Color $0000"]
+    text = "\n".join(lines)
+    (w, h) = draw.multiline_textsize(text, font=font, spacing=spacing)
+    draw.multiline_text(((64 - w) / 2, 16), text, fill=contrast, font=font,
+                        spacing=spacing, align='center')
+
+    x1 = int(round(crop_box[0] * (1 - t) + dst_x * t))
+    y1 = int(round(crop_box[1] * (1 - t) + dst_y * t))
+    x2 = int(round(crop_box[2] * (1 - t) + dst_r * t))
+    y2 = int(round(crop_box[3] * (1 - t) + dst_b * t))
+    zoom = zoom.resize((x2 - x1, y2 - y1), resample=Image.LANCZOS)
+
+    draw = ImageDraw.Draw(canvas)
+    draw.rectangle((crop_box[0] - 0.5, crop_box[1] - 0.5,
+                    crop_box[2] + 0.5, crop_box[3] + 0.5),
+                   outline=color)
+    draw.rectangle((x1 - 0.5, y1 - 0.5, x2 + 0.5, y2 + 0.5),
+                   outline=color)
+    draw.line((crop_box[0] - 0.5, crop_box[1] - 0.5, x1 - 0.5, y1 - 0.5),
+              fill=color)
+    draw.line((crop_box[2] + 0.5, crop_box[1] - 0.5, x2 + 0.5, y1 - 0.5),
+              fill=color)
+    draw.line((crop_box[0] - 0.5, crop_box[3] + 0.5, x1 - 0.5, y2 + 0.5),
+              fill=color)
+    draw.line((crop_box[2] + 0.5, crop_box[3] + 0.5, x2 + 0.5, y2 + 0.5),
+              fill=color)
+
+    canvas.paste(zoom, (x1, y1))
+    return canvas
 
 
 def _debug_array(a):
@@ -336,9 +391,10 @@ def main():
         vehicle.flags.writeable = False
 
     fig = plt.figure()
-    fig.figimage(from_ham6(background, palette, background=0)
-                 .repeat(2, axis=1).repeat(2, axis=0), resize=True)
+    fig.figimage(ham6_to_image(background, palette, background=0))
     plt.show(block=False)
+
+    font = ImageFont.truetype('DejaVuSansCondensed', 11)
 
     file_name = ('generated/frame%03d.png' % (i,) for i in itertools.count())
 
@@ -355,8 +411,29 @@ def main():
 
     for direction, steps, speed in script:
         for step in range(steps):
-            render(background, palette, vehicles[direction], position,
-                   fname=next(file_name), fig=fig, frame_skip=frame_skip)
+            fname = next(file_name)
+            if next(frame_skip):
+                ham6 = background.copy()
+                blit(ham6, vehicles[direction],
+                     dst_x=int(round(position[0])),
+                     dst_y=int(round(position[1])))
+
+                image = ham6_to_image(ham6, palette, background=0)
+                image.save(fp=fname)
+
+                fig.clf()
+                fig.figimage(image)
+                fig.canvas.draw()
+
+                for i in range(11):
+                    zoom = render_zoom(ham6, (100, 100, 104, 101),
+                                       image, (240, 150, 496, 214),
+                                       t=i / 10, font=font)
+
+                    fig.clf()
+                    fig.figimage(zoom)
+                    fig.canvas.draw()
+
             position += velocities[direction] * speed
 
     render(background, palette, vehicles[script[-1][0]], position,
