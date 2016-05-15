@@ -217,7 +217,7 @@ def from_ham6(ham6, palette, background=None):
     return rgb8
 
 
-def blit(dst, src, dst_x=0, dst_y=0):
+def blit(dst, src, dst_x=0, dst_y=0, mask=None, op=np.logical_and):
     x1 = max(dst_x, 0)
     y1 = max(dst_y, 0)
     xoff = x1 - dst_x
@@ -241,6 +241,20 @@ def blit(dst, src, dst_x=0, dst_y=0):
     else:
         dst[y1:y2, x1:x2] = clipped
 
+    if mask is None:
+        return
+
+    if not isinstance(mask, np.ndarray) or mask.ndim < 2:
+        result = np.empty_like(dst, dtype=np.bool_)
+        result[:, :] = mask
+        mask = result
+
+    result = np.empty_like(dst, dtype=np.bool_)
+    result[:, :] = op(mask, True)
+    result[y1:y2, x1:x2] = op(mask[yoff:yoff + h, xoff:xoff + w],
+                              ma.getmask(clipped))
+
+    return result
 
 
 def render(canvas, palette, vehicle=None, position=(0, 0)):
