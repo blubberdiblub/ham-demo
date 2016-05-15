@@ -232,14 +232,15 @@ def blit(dst, src, dst_x=0, dst_y=0):
     if w <= 0 or h <= 0:
         return
 
-    intermediate = src[yoff:yoff + h, xoff:xoff + w]
+    clipped = src[yoff:yoff + h, xoff:xoff + w]
 
-    if ma.is_masked(intermediate):
+    if ma.is_masked(clipped):
         where = ma.where if ma.isMaskedArray(dst) else np.where
-        intermediate = where(ma.getmaskarray(intermediate),
-                             dst[y1:y2, x1:x2], intermediate)
+        dst[y1:y2, x1:x2] = where(ma.getmaskarray(clipped),
+                                  dst[y1:y2, x1:x2], clipped)
+    else:
+        dst[y1:y2, x1:x2] = clipped
 
-    dst[y1:y2, x1:x2] = intermediate
 
 
 def render(canvas, palette, vehicle=None, position=(0, 0)):
