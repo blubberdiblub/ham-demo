@@ -462,8 +462,14 @@ def main():
 
             position += velocities[direction] * speed
 
-    render(background, palette, vehicles[script[-1][0]], position,
-           fname=next(file_name), fig=fig, frame_skip=frame_skip)
+    fname = next(file_name)
+    if next(frame_skip):
+        image = ham6_to_image(background, palette, background=0)
+        image.save(fp=fname)
+
+        fig.clf()
+        fig.figimage(image)
+        fig.canvas.draw()
 
     p2 = position.copy()
     print("position = %s" % (position,))
