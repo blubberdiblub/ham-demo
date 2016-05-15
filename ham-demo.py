@@ -275,8 +275,9 @@ def ham6_to_image(ham6, palette, background=None):
                         resample=Image.NEAREST)
 
 
-def render_zoom(canvas, src_box, dst_box, ham6, palette, background=None, t=1,
-                color=(255, 255, 255), font=None, spacing=4):
+def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
+                palette, background=None,
+                t=1, color=(255, 255, 255), font=None, spacing=4):
     src_x, src_y, src_r, src_b = src_box
     src_w = src_r - src_x
     src_h = src_b - src_y
@@ -306,6 +307,9 @@ def render_zoom(canvas, src_box, dst_box, ham6, palette, background=None, t=1,
     real = from_ham6(ham6[src_y:src_b, :src_r], palette, background=background)
     real = real[:, src_x:]
 
+    cmp = from_ham6(cmp6[src_y:src_b, :src_r], palette, background=background)
+    cmp = cmp[:, src_x:]
+
     for i in range(src_h):
         y = i + src_y
         box_y = i * box_h
@@ -315,6 +319,13 @@ def render_zoom(canvas, src_box, dst_box, ham6, palette, background=None, t=1,
 
             src_value = ham6[y, x]
             dst_color = real[i, j]
+
+            if mask is not None and not mask[y, x]:
+                title = 'Blit'
+            elif np.array_equiv(cmp[i, j], dst_color):
+                title = 'OK'
+            else:
+                title = 'bleeding'
 
             lines = [
                 "Value $%02X" % (src_value,),
@@ -333,6 +344,10 @@ def render_zoom(canvas, src_box, dst_box, ham6, palette, background=None, t=1,
             draw.multiline_text((box_x + (box_w - w) / 2, box_y + 16), text,
                                 fill=contrast, font=font,
                                 spacing=spacing, align='center')
+
+            w, h = draw.textsize(title, font=font)
+            draw.text((box_x + (box_w - w) / 2, box_y), title,
+                      fill=contrast, font=font)
 
     x1 = int(round(crop_box[0] * (1 - t) + dst_x * t))
     y1 = int(round(crop_box[1] * (1 - t) + dst_y * t))
@@ -449,32 +464,45 @@ def main():
 
     for direction, steps, speed in script:
         for step in range(steps):
+            x, y = position
+            if speed > 0:
+                position += velocities[direction] * speed
+
             fname = next(file_name)
-            if next(frame_skip):
-                ham6 = background.copy()
-                blit(ham6, vehicles[direction],
-                     dst_x=int(round(position[0])),
-                     dst_y=int(round(position[1])))
+            if not next(frame_skip):
+                continue
 
-                image = ham6_to_image(ham6, palette, background=0)
-                image.save(fp=fname)
+            ham6 = background.copy()
+            if speed <= 0 and 6 <= step <= steps - 6 and not ((step - 6) & 1):
+                mask = None
+            else:
+                mask = blit(ham6, vehicles[direction],
+                            dst_x=int(round(x)),
+                            dst_y=int(round(y)),
+                            mask=True if speed <= 0 else None)
 
-                fig.clf()
-                fig.figimage(image)
-                fig.canvas.draw()
+            image = ham6_to_image(ham6, palette, background=0)
 
-                for i in range(11):
-                    zoom = render_zoom(image,
-                                       (100, 100, 104, 101),
-                                       (240, 150, 496, 214),
-                                       ham6, palette, background=0,
-                                       t=i / 10, font=font)
+            if speed <= 0:
+                if step < 5:
+                    t = step / 5
+                elif step > steps - 5:
+                    t = (steps - step) / 5
+                else:
+                    t = 1.0
 
-                    fig.clf()
-                    fig.figimage(zoom)
-                    fig.canvas.draw()
+                image = render_zoom(image,
+                                    (100, 100, 104, 101),
+                                    (240, 150, 496, 214),
+                                    ham6, background, mask,
+                                    palette, background=0,
+                                    t=t, font=font)
 
-            position += velocities[direction] * speed
+            image.save(fp=fname)
+
+            fig.clf()
+            fig.figimage(image)
+            fig.canvas.draw()
 
     fname = next(file_name)
     if next(frame_skip):
