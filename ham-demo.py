@@ -260,8 +260,8 @@ def ham6_to_image(ham6, palette, background=None):
                         resample=Image.NEAREST)
 
 
-def render_zoom(ham6, src_box, canvas, dst_box, t=1, color=(255, 255, 255),
-                font=None, spacing=4):
+def render_zoom(canvas, src_box, dst_box, ham6, palette, background=None, t=1,
+                color=(255, 255, 255), font=None, spacing=4):
     src_x, src_y, src_r, src_b = src_box
     src_w = src_r - src_x
     src_h = src_b - src_y
@@ -288,13 +288,36 @@ def render_zoom(ham6, src_box, canvas, dst_box, t=1, color=(255, 255, 255),
 
     draw = ImageDraw.Draw(zoom, 'RGBA')
 
-    contrast = tuple(255 if value < 128 else 0
-                     for value in zoom.getpixel((0, 0)))
-    lines = ["Value $00", "= Pal. #0", "Color $0000"]
-    text = "\n".join(lines)
-    (w, h) = draw.multiline_textsize(text, font=font, spacing=spacing)
-    draw.multiline_text(((64 - w) / 2, 16), text, fill=contrast, font=font,
-                        spacing=spacing, align='center')
+    real = from_ham6(ham6[src_y:src_b, :src_r], palette, background=background)
+    real = real[:, src_x:]
+
+    for i in range(src_h):
+        y = i + src_y
+        box_y = i * box_h
+        for j in range(src_w):
+            x = j + src_x
+            box_x = j * box_w
+
+            src_value = ham6[y, x]
+            dst_color = real[i, j]
+
+            lines = [
+                "Value $%02X" % (src_value,),
+                (
+                    "⇒ Pal. #%d",
+                    "Blue ⇒ $%X",
+                    "Red ⇒ $%X",
+                    "Green ⇒ $%X",
+                )[src_value >> 4] % (src_value & 0xF,),
+                "Color $0%X%X%X" % tuple(value >> 4 for value in dst_color),
+            ]
+            text = "\n".join(lines)
+
+            (w, h) = draw.multiline_textsize(text, font=font, spacing=spacing)
+            contrast = tuple(255 if value < 128 else 0 for value in dst_color)
+            draw.multiline_text((box_x + (box_w - w) / 2, box_y + 16), text,
+                                fill=contrast, font=font,
+                                spacing=spacing, align='center')
 
     x1 = int(round(crop_box[0] * (1 - t) + dst_x * t))
     y1 = int(round(crop_box[1] * (1 - t) + dst_y * t))
@@ -426,8 +449,10 @@ def main():
                 fig.canvas.draw()
 
                 for i in range(11):
-                    zoom = render_zoom(ham6, (100, 100, 104, 101),
-                                       image, (240, 150, 496, 214),
+                    zoom = render_zoom(image,
+                                       (100, 100, 104, 101),
+                                       (240, 150, 496, 214),
+                                       ham6, palette, background=0,
                                        t=i / 10, font=font)
 
                     fig.clf()
