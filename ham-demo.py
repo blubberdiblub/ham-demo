@@ -470,7 +470,7 @@ def main():
             yield counter < 1
             counter = (counter + 1) % period
 
-    frame_skip = render_frame(period=12)
+    frame_skip = render_frame(period=1)
 
     position = np.array((-56.0, 20.0))
     p1 = position.copy()
