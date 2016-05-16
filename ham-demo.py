@@ -277,7 +277,8 @@ def ham6_to_image(ham6, palette, background=None):
 
 def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
                 palette, background=None,
-                t=1, color=(255, 255, 255), font=None, spacing=4):
+                t=1, color=(255, 255, 255),
+                title_font=None, plain_font=None, spacing=4):
     src_x, src_y, src_r, src_b = src_box
     src_w = src_r - src_x
     src_h = src_b - src_y
@@ -299,8 +300,10 @@ def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
     crop = canvas.crop(crop_box)
     zoom = crop.resize((dst_w, dst_h), resample=Image.NEAREST)
 
-    if font is None:
-        font = ImageFont.load_default()
+    if plain_font is None:
+        plain_font = ImageFont.load_default()
+    if title_font is None:
+        title_font = plain_font
 
     draw = ImageDraw.Draw(zoom, 'RGBA')
 
@@ -309,6 +312,13 @@ def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
 
     cmp = from_ham6(cmp6[src_y:src_b, :src_r], palette, background=background)
     cmp = cmp[:, src_x:]
+
+    title_height = draw.textsize('H', font=title_font)[1]
+    plain_height = draw.multiline_textsize('H\nH\nH', font=plain_font,
+                                           spacing=spacing)[1] - spacing
+    empty_height = box_h - title_height - plain_height
+    title_y = empty_height / 3
+    plain_y = empty_height * 2 / 3 + title_height
 
     for i in range(src_h):
         y = i + src_y
@@ -339,15 +349,16 @@ def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
             ]
             text = "\n".join(lines)
 
-            (w, h) = draw.multiline_textsize(text, font=font, spacing=spacing)
+            (w, h) = draw.multiline_textsize(text, font=plain_font,
+                                             spacing=spacing)
             contrast = tuple(255 if value < 128 else 0 for value in dst_color)
-            draw.multiline_text((box_x + (box_w - w) / 2, box_y + 16), text,
-                                fill=contrast, font=font,
+            draw.multiline_text((box_x + (box_w - w) / 2, box_y + plain_y),
+                                text, fill=contrast, font=plain_font,
                                 spacing=spacing, align='center')
 
-            w, h = draw.textsize(title, font=font)
-            draw.text((box_x + (box_w - w) / 2, box_y), title,
-                      fill=contrast, font=font)
+            w, h = draw.textsize(title, font=title_font)
+            draw.text((box_x + (box_w - w) / 2, box_y + title_y), title,
+                      fill=contrast, font=title_font)
 
     x1 = int(round(crop_box[0] * (1 - t) + dst_x * t))
     y1 = int(round(crop_box[1] * (1 - t) + dst_y * t))
@@ -448,7 +459,8 @@ def main():
     fig.figimage(ham6_to_image(background, palette, background=0))
     plt.show(block=False)
 
-    font = ImageFont.truetype('DejaVuSansCondensed', 11)
+    title_font = ImageFont.truetype('DejaVuSansCondensed-Bold', 11)
+    plain_font = ImageFont.truetype('DejaVuSansCondensed', 11)
 
     file_name = ('generated/frame%03d.png' % (i,) for i in itertools.count())
 
@@ -497,7 +509,9 @@ def main():
                                     (240, 150, 496, 214),
                                     ham6, background, mask,
                                     palette, background=0,
-                                    t=t, font=font)
+                                    t=t, color=(0x66, 0x77, 0xFF),
+                                    title_font=title_font,
+                                    plain_font=plain_font)
 
             image.save(fp=fname)
 
