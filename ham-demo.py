@@ -321,7 +321,7 @@ def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
             dst_color = real[i, j]
 
             if mask is not None and not mask[y, x]:
-                title = 'Blit'
+                title = 'Blit BOB'
             elif np.array_equiv(cmp[i, j], dst_color):
                 title = 'OK'
             else:
@@ -335,7 +335,7 @@ def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
                     "Red ⇒ $%X",
                     "Green ⇒ $%X",
                 )[src_value >> 4] % (src_value & 0xF,),
-                "Color $0%X%X%X" % tuple(value >> 4 for value in dst_color),
+                "Color $%X%X%X" % tuple(value >> 4 for value in dst_color),
             ]
             text = "\n".join(lines)
 
