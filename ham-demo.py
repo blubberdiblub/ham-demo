@@ -353,7 +353,7 @@ def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
     y1 = int(round(crop_box[1] * (1 - t) + dst_y * t))
     x2 = int(round(crop_box[2] * (1 - t) + dst_r * t))
     y2 = int(round(crop_box[3] * (1 - t) + dst_b * t))
-    zoom = zoom.resize((x2 - x1, y2 - y1), resample=Image.LANCZOS)
+    zoom = zoom.resize((x2 - x1, y2 - y1), resample=Image.NEAREST)
 
     draw = ImageDraw.Draw(canvas)
     draw.rectangle((crop_box[0] - 0.5, crop_box[1] - 0.5,
