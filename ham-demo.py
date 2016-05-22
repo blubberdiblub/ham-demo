@@ -278,7 +278,7 @@ def ham6_to_image(ham6, palette, background=None):
 def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
                 palette, background=None,
                 t=1, color=(255, 255, 255),
-                title_font=None, plain_font=None, spacing=4):
+                title_font=None, plain_font=None, spacing=0):
     src_x, src_y, src_r, src_b = src_box
     src_w = src_r - src_x
     src_h = src_b - src_y
@@ -313,10 +313,11 @@ def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
     cmp = from_ham6(cmp6[src_y:src_b, :src_r], palette, background=background)
     cmp = cmp[:, src_x:]
 
-    title_height = draw.textsize('H', font=title_font)[1]
-    plain_height = draw.multiline_textsize('H\nH\nH', font=plain_font,
-                                           spacing=spacing)[1] - spacing
-    empty_height = box_h - title_height - plain_height
+    ascender, descender = title_font.getmetrics()
+    title_height = ascender + descender
+    ascender, descender = plain_font.getmetrics()
+    plain_height = ascender + descender
+    empty_height = box_h - title_height - plain_height * 3 - spacing * 2
     title_y = empty_height / 3
     plain_y = empty_height * 2 / 3 + title_height
 
@@ -347,18 +348,17 @@ def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
                 )[src_value >> 4] % (src_value & 0xF,),
                 "Color $%X%X%X" % tuple(value >> 4 for value in dst_color),
             ]
-            text = "\n".join(lines)
 
-            (w, h) = draw.multiline_textsize(text, font=plain_font,
-                                             spacing=spacing)
             contrast = tuple(255 if value < 128 else 0 for value in dst_color)
-            draw.multiline_text((box_x + (box_w - w) / 2, box_y + plain_y),
-                                text, fill=contrast, font=plain_font,
-                                spacing=spacing, align='center')
-
-            w, h = draw.textsize(title, font=title_font)
+            w = draw.textsize(title, font=title_font)[0]
             draw.text((box_x + (box_w - w) / 2, box_y + title_y), title,
                       fill=contrast, font=title_font)
+
+            for row, line in enumerate(lines):
+                w = draw.textsize(line, font=plain_font)[0]
+                draw.text((box_x + (box_w - w) / 2,
+                           box_y + plain_y + row * (plain_height + spacing)),
+                          line, fill=contrast, font=plain_font)
 
     x1 = int(round(crop_box[0] * (1 - t) + dst_x * t))
     y1 = int(round(crop_box[1] * (1 - t) + dst_y * t))
