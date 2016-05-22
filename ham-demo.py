@@ -275,6 +275,20 @@ def ham6_to_image(ham6, palette, background=None):
                         resample=Image.NEAREST)
 
 
+def highest_contrast(reference, choice=((0, 0, 0), (255, 255, 255))):
+    reference = np.asanyarray(reference)
+    max_dist = None
+    best_color = None
+
+    for color in choice:
+        d = color_distance(reference, np.asanyarray(color))
+        if max_dist is None or d > max_dist:
+            max_dist = d
+            best_color = color
+
+    return best_color
+
+
 def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
                 palette, background=None,
                 t=1, color=(255, 255, 255),
@@ -333,10 +347,22 @@ def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
 
             if mask is not None and not mask[y, x]:
                 title = 'Blit'
+                title_colors = (
+                    (0xFF, 0x00, 0x00),
+                    (0xFF, 0x55, 0x55),
+                )
             elif np.array_equiv(cmp[i, j], dst_color):
                 title = 'OK'
+                title_colors = (
+                    (0x00, 0xFF, 0x00),
+                    (0x00, 0xAA, 0x00),
+                )
             else:
                 title = 'bleeding'
+                title_colors = (
+                    (0xFF, 0x00, 0xFF),
+                    (0xFF, 0xAA, 0x00),
+                )
 
             lines = [
                 "Value $%02X" % (src_value,),
@@ -349,11 +375,13 @@ def render_zoom(canvas, src_box, dst_box, ham6, cmp6, mask,
                 "Color $%X%X%X" % tuple(value >> 4 for value in dst_color),
             ]
 
-            contrast = tuple(255 if value < 128 else 0 for value in dst_color)
+            contrast = highest_contrast(dst_color, title_colors)
             w = draw.textsize(title, font=title_font)[0]
             draw.text((box_x + (box_w - w) / 2, box_y + title_y), title,
                       fill=contrast, font=title_font)
 
+            contrast = highest_contrast(dst_color, ((0x66, 0x66, 0x66),
+                                                    (0xFF, 0xFF, 0xFF)))
             for row, line in enumerate(lines):
                 w = draw.textsize(line, font=plain_font)[0]
                 draw.text((box_x + (box_w - w) / 2,
