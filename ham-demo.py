@@ -487,8 +487,8 @@ def main():
     fig.figimage(ham6_to_image(background, palette, background=0))
     plt.show(block=False)
 
-    title_font = ImageFont.truetype('DejaVuSansCondensed-Bold', 11)
-    plain_font = ImageFont.truetype('DejaVuSansCondensed', 11)
+    title_font = ImageFont.truetype('DejaVuSansCondensed-Bold', 13)
+    plain_font = ImageFont.truetype('DejaVuSansCondensed', 12)
 
     file_name = ('generated/frame%03d.png' % (i,) for i in itertools.count())
 
